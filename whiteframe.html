@@ -1,174 +1,161 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Whiteframe</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       background-color: #000;
-      color: #fff;
+      color: white;
       font-family: sans-serif;
       text-align: center;
-      padding: 10px;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .controls, .buttons {
+      margin-top: 15px;
+    }
+
+    .controls label, .buttons button {
+      display: block;
+      margin: 10px auto;
+      font-size: 16px;
     }
 
     input, select, button {
-      font-size: 1.2em;
-      margin: 8px;
+      font-size: 16px;
+      padding: 5px;
+      margin-top: 5px;
     }
 
-    canvas {
-      display: block;
-      margin: 10px auto;
-      background: white;
-    }
-
-    #outputImage {
-      margin-top: 10px;
+    #previewWrapper {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      background-color: #000;
+      overflow: auto;
       max-width: 100%;
-      display: none;
-    }
-
-    label, .control-group {
-      display: block;
-      margin: 12px 0;
-    }
-
-    .control-group {
-      padding: 10px;
+      max-height: 70vh;
       border: 1px solid #444;
-      border-radius: 10px;
+      padding: 10px;
+    }
+
+    #previewCanvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Whiteframe</h1>
-
-  <div class="control-group">
-    <label>画像を選択:</label>
-    <input type="file" id="imageInput" accept="image/*">
+  <div class="container">
+    <h1>Whiteframe</h1>
+    <input type="file" id="imageInput" accept="image/*" />
+    <div class="controls">
+      <label>枠の太さ (px):
+        <input type="number" id="frameSize" value="100" min="0" />
+      </label>
+      <label>背景紙の比率:
+        <select id="aspectRatio">
+          <option value="1:1">1:1</option>
+          <option value="3:4">3:4</option>
+          <option value="4:5">4:5</option>
+          <option value="5:7">5:7</option>
+          <option value="2:3">2:3</option>
+          <option value="3:2">3:2</option>
+          <option value="4:3">4:3</option>
+          <option value="5:4">5:4</option>
+          <option value="7:5">7:5</option>
+          <option value="16:9">16:9</option>
+        </select>
+      </label>
+    </div>
+    <div class="buttons">
+      <button onclick="addWhiteFrame()">枠を追加</button>
+      <button onclick="saveImage()">画像を保存</button>
+    </div>
+    <div id="previewWrapper">
+      <canvas id="previewCanvas"></canvas>
+    </div>
+    <p class="note">※画像を長押しで保存できない場合は「画像を保存」ボタンをご利用ください。</p>
   </div>
-
-  <div class="control-group">
-    <label>枠の太さ (px):</label>
-    <select id="borderWidth">
-      <option value="50">50</option>
-      <option value="100" selected>100</option>
-      <option value="200">200</option>
-      <option value="custom">カスタム</option>
-    </select>
-    <input type="number" id="customWidth" placeholder="pxを入力" style="display:none;">
-  </div>
-
-  <div class="control-group">
-    <label>背景紙の比率:</label>
-    <select id="canvasRatio">
-      <option value="original">オリジナル</option>
-      <option value="1:1">1:1</option>
-      <option value="3:2">3:2</option>
-      <option value="4:3">4:3</option>
-      <option value="5:4">5:4</option>
-      <option value="16:9">16:9</option>
-      <option value="2:3">2:3</option>
-      <option value="3:4">3:4</option>
-      <option value="4:5">4:5</option>
-      <option value="9:16">9:16</option>
-      <option value="custom">カスタム</option>
-    </select>
-    <input type="text" id="customRatio" placeholder="例: 7:5" style="display:none;">
-  </div>
-
-  <button id="addFrameBtn">枠を追加</button>
-  <a id="downloadBtn" style="display:none;" download><button>画像を保存</button></a>
-
-  <canvas id="canvas"></canvas>
-  <img id="outputImage" alt="framed image">
 
   <script>
-    const imageInput = document.getElementById('imageInput');
-    const borderWidthSelect = document.getElementById('borderWidth');
-    const customWidthInput = document.getElementById('customWidth');
-    const canvasRatioSelect = document.getElementById('canvasRatio');
-    const customRatioInput = document.getElementById('customRatio');
-    const addFrameBtn = document.getElementById('addFrameBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    let originalImage = null;
 
-    let image = new Image();
-
-    borderWidthSelect.addEventListener('change', () => {
-      customWidthInput.style.display = borderWidthSelect.value === 'custom' ? 'inline-block' : 'none';
-    });
-
-    canvasRatioSelect.addEventListener('change', () => {
-      customRatioInput.style.display = canvasRatioSelect.value === 'custom' ? 'inline-block' : 'none';
-    });
-
-    imageInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
+    document.getElementById("imageInput").addEventListener("change", (e) => {
       const reader = new FileReader();
-      reader.onload = e => {
-        image.src = e.target.result;
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          originalImage = img;
+          drawPreview();
+        };
+        img.src = event.target.result;
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(e.target.files[0]);
     });
 
-    addFrameBtn.addEventListener('click', () => {
-      if (!image.src) return;
+    function parseAspectRatio(ratioStr) {
+      const [w, h] = ratioStr.split(":").map(Number);
+      return w / h;
+    }
 
-      const borderWidth = borderWidthSelect.value === 'custom'
-        ? parseInt(customWidthInput.value, 10)
-        : parseInt(borderWidthSelect.value, 10);
+    function drawPreview() {
+      if (!originalImage) return;
 
-      const ratioValue = canvasRatioSelect.value;
-      let ratioW = image.width;
-      let ratioH = image.height;
+      const frameSize = parseInt(document.getElementById("frameSize").value) || 0;
+      const aspectRatio = parseAspectRatio(document.getElementById("aspectRatio").value);
 
-      if (ratioValue === 'custom' && customRatioInput.value.includes(':')) {
-        const [w, h] = customRatioInput.value.split(':').map(Number);
-        if (w > 0 && h > 0) {
-          ratioW = w;
-          ratioH = h;
-        }
-      } else if (ratioValue !== 'original') {
-        const [w, h] = ratioValue.split(':').map(Number);
-        if (w && h) {
-          ratioW = w;
-          ratioH = h;
-        }
-      }
+      const imgW = originalImage.width;
+      const imgH = originalImage.height;
+      const imgRatio = imgW / imgH;
 
-      const imageRatio = image.width / image.height;
-      const canvasRatio = ratioW / ratioH;
-
-      let canvasWidth, canvasHeight;
-
-      if (canvasRatio > imageRatio) {
-        canvasHeight = image.height + 2 * borderWidth;
-        canvasWidth = canvasHeight * canvasRatio;
+      let bgW, bgH;
+      if (imgRatio >= aspectRatio) {
+        bgW = imgW + frameSize * 2;
+        bgH = bgW / aspectRatio;
       } else {
-        canvasWidth = image.width + 2 * borderWidth;
-        canvasHeight = canvasWidth / canvasRatio;
+        bgH = imgH + frameSize * 2;
+        bgW = bgH * aspectRatio;
       }
 
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
+      const canvas = document.getElementById("previewCanvas");
+      canvas.width = bgW;
+      canvas.height = bgH;
+      const ctx = canvas.getContext("2d");
 
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, bgW, bgH);
 
-      const x = (canvas.width - image.width) / 2;
-      const y = (canvas.height - image.height) / 2;
-      ctx.drawImage(image, x, y);
+      const offsetX = (bgW - imgW) / 2;
+      const offsetY = (bgH - imgH) / 2;
+      ctx.drawImage(originalImage, offsetX, offsetY);
+    }
 
-      const dataURL = canvas.toDataURL('image/jpeg', 1.0);
-      downloadBtn.href = dataURL;
-      downloadBtn.download = imageInput.files[0].name.replace(/\.(jpe?g|png)$/i, '_01.jpg');
-      downloadBtn.style.display = 'inline-block';
-    });
+    function addWhiteFrame() {
+      drawPreview();
+    }
+
+    function saveImage() {
+      const canvas = document.getElementById("previewCanvas");
+      const link = document.createElement("a");
+      link.download = "framed.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
   </script>
 </body>
 </html>
