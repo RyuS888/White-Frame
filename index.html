@@ -1,79 +1,131 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Whiteframe</title>
-<style>
-  body { background:#000; color:#fff; font-family:sans-serif; text-align:center; padding:10px; }
-  .controls select, .controls button, #imageInput { margin:5px; font-size:16px; padding:5px 8px; }
-  #previewContainer { max-width:90vw; max-height:60vh; margin:10px auto; overflow:auto; }
-  #preview { display:block; width:auto; height:auto; }
-  #canvas { display:none; }
-</style>
+<head>
+  <meta charset="UTF-8">
+  <title>Whiteframe Test</title>
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    .controls {
+      margin: 20px;
+    }
+    #previewContainer {
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow: auto;
+      margin: auto;
+      border: 1px solid #444;
+    }
+    #preview {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    canvas {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Whiteframe</h1>
+  <h1>Whiteframe Test</h1>
   <div class="controls">
-    <input type="file" id="imageInput" accept="image/*"><br>
+    <input type="file" id="imageInput">
     <select id="ratioSelect">
-      <option value="none">変更なし</option><option value="1:1">1:1</option><option value="3:2">3:2</option><option value="4:3">4:3</option><option value="16:9">16:9</option><option value="16:10">16:10</option><option value="2:1">2:1</option><option value="2.35:1">2.35:1</option><option value="3:1">3:1</option><option value="7:6">7:6</option><option value="5:4">5:4</option>
+      <option>3:2</option>
+      <option>4:3</option>
+      <option>5:4</option>
+      <option>7:6</option>
+      <option>16:10</option>
+      <option>16:9</option>
+      <option>2:1</option>
+      <option>2.35:1</option>
+      <option>3:1</option>
+      <option>1:1</option>
     </select>
-    <button id="toggleOrientation">背景：横</button>
-    <select id="borderSize"><option value="50">50px</option><option value="100" selected>100px</option><option value="200">200px</option></select>
-    <button id="applyBtn">枠を追加</button>
+    <select id="orientationSelect">
+      <option value="landscape">背景：横</option>
+      <option value="portrait">背景：縦</option>
+    </select>
+    <select id="marginSelect">
+      <option value="50">50px</option>
+      <option value="100" selected>100px</option>
+      <option value="200">200px</option>
+    </select>
+    <button id="addFrameBtn">枠を追加</button>
   </div>
-  <div id="previewContainer"><img id="preview" src="" alt="プレビュー"></div>
-  <canvas id="canvas"></canvas>
-  <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
+
+  <div id="previewContainer">
+    <img id="preview" />
+    <canvas id="canvas"></canvas>
+  </div>
+
   <script>
-    const inp = document.getElementById('imageInput'), pr = document.getElementById('preview'), cn = document.getElementById('canvas'), ctx = cn.getContext('2d');
-    const ratioEl = document.getElementById('ratioSelect'), toggle = document.getElementById('toggleOrientation'), bEl = document.getElementById('borderSize'), btn = document.getElementById('applyBtn');
-    let imgObj = null, exif = null, bgOrient = 'landscape';
-    toggle.onclick = () => {
-      bgOrient = bgOrient === 'landscape' ? 'portrait' : 'landscape';
-      toggle.textContent = bgOrient === 'landscape' ? '背景：横' : '背景：縦';
-    };
-    inp.onchange = () => {
-      const f = inp.files[0]; if (!f) return;
-      const r = new FileReader();
-      r.onload = e => { try { exif = piexif.load(e.target.result); } catch { exif = null; } };
-      r.readAsBinaryString(f);
-      const url = URL.createObjectURL(f), img = new Image();
-      img.onload = () => { imgObj = img; draw(); };
-      img.src = url;
-    };
-    btn.onclick = draw;
-    pr.onclick = () => {}; // 新規タブ機能は削除
-    function draw() {
-      if (!imgObj) return;
-      const b = +bEl.value, rv = ratioEl.value, [wR,hR] = rv==='none'?[imgObj.width,imgObj.height]:rv.split(':').map(Number);
-      const oW = imgObj.width, oH = imgObj.height;
-      // 背景比率方向に応じて論理比率を取る
-      let bw = oW + 2*b, bh = oH + 2*b;
-      if (rv!=='none') {
-        const baseW = bgOrient==='landscape'? wR : hR, baseH = bgOrient==='landscape'? hR : wR;
-        const imgRatio = oW/oH, targetRatio = baseW/baseH;
-        if (imgRatio > targetRatio) {
-          bw = oW + 2*b;
-          bh = Math.round(bw / targetRatio);
-        } else {
-          bh = oH + 2*b;
-          bw = Math.round(bh * targetRatio);
-        }
-      }
-      cn.width = bw; cn.height = bh;
-      ctx.clearRect(0,0,bw,bh);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0,0,bw,bh);
-      ctx.drawImage(imgObj, (bw-oW)/2, (bh-oH)/2, oW, oH);
-      const full = cn.toDataURL('image/jpeg',0.92);
-      pr.src = full;
-      pr.removeAttribute('width');
-      pr.removeAttribute('height');
-      pr.style.display = 'block';
-      pr.style.maxWidth = 'none';
-      pr.style.maxHeight = 'none';
-      // 保存用EXIF追加
-      if (exif) pr.src = piexif.insert(piexif.dump(exif), full);
+    const imageInput = document.getElementById('imageInput');
+    const ratioSelect = document.getElementById('ratioSelect');
+    const orientationSelect = document.getElementById('orientationSelect');
+    const marginSelect = document.getElementById('marginSelect');
+    const preview = document.getElementById('preview');
+    const canvas = document.getElementById('canvas');
+
+    let loadedImage = new Image();
+
+    imageInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = event => {
+        loadedImage.onload = () => {
+          preview.src = loadedImage.src;
+        };
+        loadedImage.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function parseRatio(ratioStr, orientation) {
+      let [w, h] = ratioStr.split(':').map(Number);
+      if (orientation === 'portrait') [w, h] = [h, w]; // 自動で縦横変換
+      return { w, h };
     }
+
+    document.getElementById('addFrameBtn').addEventListener('click', () => {
+      const ratioStr = ratioSelect.value;
+      const orientation = orientationSelect.value;
+      const margin = parseInt(marginSelect.value, 10);
+      const { w: rw, h: rh } = parseRatio(ratioStr, orientation);
+
+      const imgW = loadedImage.width;
+      const imgH = loadedImage.height;
+      const imgAspect = imgW / imgH;
+      const bgAspect = rw / rh;
+
+      let targetW, targetH;
+      if (imgAspect > bgAspect) {
+        // 横が余る
+        targetH = imgH + margin * 2;
+        targetW = targetH * bgAspect;
+      } else {
+        // 縦が余る
+        targetW = imgW + margin * 2;
+        targetH = targetW / bgAspect;
+      }
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const x = (canvas.width - imgW) / 2;
+      const y = (canvas.height - imgH) / 2;
+      ctx.drawImage(loadedImage, x, y);
+
+      preview.src = canvas.toDataURL('image/jpeg');
+    });
   </script>
 </body>
 </html>
