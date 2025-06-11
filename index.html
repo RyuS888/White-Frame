@@ -1,69 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>White Frame テスト版</title>
+  <title>White Frame テスト</title>
   <style>
-    body {
-      text-align: center;
-      font-family: sans-serif;
-      padding: 20px;
-    }
     canvas {
+      border: 1px solid #ccc;
       display: block;
       margin: 20px auto;
-      max-width: 95vw;
-      height: auto;
     }
   </style>
 </head>
 <body>
-  <h1>White Frame テスト版</h1>
-  <input type="file" id="upload" accept="image/*"><br>
+  <h2 style="text-align:center;">White Frame テスト</h2>
+  <div style="text-align:center;">
+    <input type="file" id="fileInput">
+  </div>
   <canvas id="canvas"></canvas>
 
   <script>
-    document.getElementById('upload').addEventListener('change', function (e) {
+    const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      const img = new Image();
-      img.onload = () => {
-        const whiteMargin = 100;
-        const bgRatioW = 4, bgRatioH = 5;
-
-        const imgW = img.width;
-        const imgH = img.height;
-        const withMarginW = imgW + whiteMargin * 2;
-        const withMarginH = imgH + whiteMargin * 2;
-
-        const targetRatio = bgRatioW / bgRatioH;
-        let canvasW = withMarginW;
-        let canvasH = withMarginH;
-
-        if (withMarginW / withMarginH > targetRatio) {
-          canvasH = Math.round(withMarginW / targetRatio);
-        } else {
-          canvasW = Math.round(withMarginH * targetRatio);
-        }
-
-        const offsetX = (canvasW - withMarginW) / 2 + whiteMargin;
-        const offsetY = (canvasH - withMarginH) / 2 + whiteMargin;
-
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = canvasW;
-        canvas.height = canvasH;
-
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvasW, canvasH);
-
-        ctx.drawImage(img, offsetX, offsetY, imgW, imgH);
-      };
-
       const reader = new FileReader();
-      reader.onload = e => {
-        img.src = e.target.result;
+      reader.onload = function (event) {
+        const img = new Image();
+        img.onload = function () {
+          // 白枠サイズと背景比率（5:4）の設定
+          const whiteMargin = 100;
+          const imgW = img.width;
+          const imgH = img.height;
+          const framedW = imgW + whiteMargin * 2;
+          const framedH = imgH + whiteMargin * 2;
+
+          // 最終背景サイズ：5:4比率を保つようにcanvasを調整
+          let bgW = framedW;
+          let bgH = framedW * 4 / 5;
+          if (bgH < framedH) {
+            bgH = framedH;
+            bgW = bgH * 5 / 4;
+          }
+
+          canvas.width = bgW;
+          canvas.height = bgH;
+
+          // 背景白
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, bgW, bgH);
+
+          // 画像＋白枠を描画
+          const offsetX = (bgW - framedW) / 2 + whiteMargin;
+          const offsetY = (bgH - framedH) / 2 + whiteMargin;
+          ctx.drawImage(img, offsetX, offsetY, imgW, imgH);
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     });
