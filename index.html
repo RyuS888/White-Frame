@@ -13,16 +13,15 @@
     input[type="file"] {
       margin-top: 1em;
     }
-    canvas {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-    }
     .preview-wrapper {
       overflow: auto;
       max-height: 80vh;
       margin: 1em auto;
+      border: 1px solid #ccc;
+    }
+    canvas {
+      display: block;
+      margin: auto;
     }
   </style>
 </head>
@@ -32,6 +31,7 @@
   <div class="preview-wrapper">
     <canvas id="canvas"></canvas>
   </div>
+
   <script>
     const input = document.getElementById("imageInput");
     const canvas = document.getElementById("canvas");
@@ -40,6 +40,7 @@
     input.addEventListener("change", async (event) => {
       const file = event.target.files[0];
       if (!file) return;
+
       const img = new Image();
       img.onload = () => {
         const whiteFrame = 100;
@@ -49,7 +50,7 @@
         const framedW = imgW + whiteFrame * 2;
         const framedH = imgH + whiteFrame * 2;
 
-        // 例として背景紙5:4を仮定（縦用）
+        // 背景紙比率：5:4 縦
         const bgRatio = 5 / 4;
         let finalW = framedW;
         let finalH = framedH;
@@ -67,10 +68,15 @@
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, finalW, finalH);
 
-        // 白枠付き画像
-        const offsetX = (finalW - framedW) / 2 + whiteFrame;
-        const offsetY = (finalH - framedH) / 2 + whiteFrame;
+        // 白枠つき画像
+        const offsetX = (finalW - imgW) / 2;
+        const offsetY = (finalH - imgH) / 2;
+
+        // 白枠
+        ctx.fillStyle = "#fff";
         ctx.fillRect(offsetX - whiteFrame, offsetY - whiteFrame, imgW + whiteFrame * 2, imgH + whiteFrame * 2);
+
+        // 画像本体
         ctx.drawImage(img, offsetX, offsetY, imgW, imgH);
       };
       img.src = URL.createObjectURL(file);
