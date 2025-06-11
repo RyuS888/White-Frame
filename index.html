@@ -1,85 +1,71 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="UTF-8">
   <title>White Frame テスト版</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      margin: 0;
-      font-family: sans-serif;
       text-align: center;
-    }
-    input[type="file"] {
-      margin-top: 1em;
-    }
-    .preview-wrapper {
-      overflow: auto;
-      max-height: 80vh;
-      margin: 1em auto;
-      border: 1px solid #ccc;
+      font-family: sans-serif;
+      padding: 20px;
     }
     canvas {
       display: block;
-      margin: auto;
+      margin: 20px auto;
+      max-width: 95vw;
+      height: auto;
     }
   </style>
 </head>
 <body>
-  <h2>White Frame テスト版</h2>
-  <input type="file" id="imageInput" accept="image/*"><br>
-  <div class="preview-wrapper">
-    <canvas id="canvas"></canvas>
-  </div>
+  <h1>White Frame テスト版</h1>
+  <input type="file" id="upload" accept="image/*"><br>
+  <canvas id="canvas"></canvas>
 
   <script>
-    const input = document.getElementById("imageInput");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-
-    input.addEventListener("change", async (event) => {
-      const file = event.target.files[0];
+    document.getElementById('upload').addEventListener('change', function (e) {
+      const file = e.target.files[0];
       if (!file) return;
 
       const img = new Image();
       img.onload = () => {
-        const whiteFrame = 100;
+        const whiteMargin = 100;
+        const bgRatioW = 4, bgRatioH = 5;
+
         const imgW = img.width;
         const imgH = img.height;
+        const withMarginW = imgW + whiteMargin * 2;
+        const withMarginH = imgH + whiteMargin * 2;
 
-        const framedW = imgW + whiteFrame * 2;
-        const framedH = imgH + whiteFrame * 2;
+        const targetRatio = bgRatioW / bgRatioH;
+        let canvasW = withMarginW;
+        let canvasH = withMarginH;
 
-        // 背景紙比率：5:4 縦
-        const bgRatio = 5 / 4;
-        let finalW = framedW;
-        let finalH = framedH;
-
-        if (framedH / framedW > bgRatio) {
-          finalW = framedH / bgRatio;
+        if (withMarginW / withMarginH > targetRatio) {
+          canvasH = Math.round(withMarginW / targetRatio);
         } else {
-          finalH = framedW * bgRatio;
+          canvasW = Math.round(withMarginH * targetRatio);
         }
 
-        canvas.width = finalW;
-        canvas.height = finalH;
+        const offsetX = (canvasW - withMarginW) / 2 + whiteMargin;
+        const offsetY = (canvasH - withMarginH) / 2 + whiteMargin;
 
-        // 背景紙
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, finalW, finalH);
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvasW;
+        canvas.height = canvasH;
 
-        // 白枠つき画像
-        const offsetX = (finalW - imgW) / 2;
-        const offsetY = (finalH - imgH) / 2;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvasW, canvasH);
 
-        // 白枠
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(offsetX - whiteFrame, offsetY - whiteFrame, imgW + whiteFrame * 2, imgH + whiteFrame * 2);
-
-        // 画像本体
         ctx.drawImage(img, offsetX, offsetY, imgW, imgH);
       };
-      img.src = URL.createObjectURL(file);
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     });
   </script>
 </body>
