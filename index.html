@@ -1,68 +1,75 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
   <title>White Frame テスト</title>
   <style>
     body {
-      margin: 0;
-      font-family: sans-serif;
       text-align: center;
-      background: #fff;
+      font-family: sans-serif;
     }
-
-    h1 {
-      font-size: 1.2em;
-      margin-top: 1em;
-    }
-
-    input[type="file"] {
-      margin: 1em;
-    }
-
     canvas {
-      display: block;
-      margin: 0 auto 2em;
       max-width: 100%;
       height: auto;
-      border: 1px solid #ccc;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>White Frame テスト</h1>
-  <input type="file" accept="image/*" id="fileInput" />
-
+  <h2>White Frame テスト</h2>
+  <input type="file" id="imageInput" accept="image/*"><br>
   <canvas id="canvas"></canvas>
 
   <script>
-    const input = document.getElementById("fileInput");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const imageInput = document.getElementById('imageInput');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-    input.addEventListener("change", (e) => {
+    const whiteFrame = 100; // 100pxの白枠
+    const bgAspectW = 4;
+    const bgAspectH = 5;
+
+    imageInput.addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-          // 最大辺3000pxに抑えてスケーリング（描画失敗防止）
-          const maxSide = 3000;
-          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-          const imgW = img.width * scale;
-          const imgH = img.height * scale;
+      const img = new Image();
+      img.onload = function () {
+        const imgW = img.width;
+        const imgH = img.height;
 
-          canvas.width = imgW;
-          canvas.height = imgH;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, imgW, imgH);
-        };
-        img.src = event.target.result;
+        // 白枠を追加した画像サイズ
+        const framedW = imgW + whiteFrame * 2;
+        const framedH = imgH + whiteFrame * 2;
+
+        // 背景紙サイズ（4:5）を計算
+        let bgW = framedW;
+        let bgH = framedW * (bgAspectH / bgAspectW);
+
+        if (bgH < framedH) {
+          bgH = framedH;
+          bgW = framedH * (bgAspectW / bgAspectH);
+        }
+
+        canvas.width = bgW;
+        canvas.height = bgH;
+
+        // 背景紙（白）
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, bgW, bgH);
+
+        // 白枠（上下左右100px）
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect((bgW - framedW) / 2, (bgH - framedH) / 2, framedW, framedH);
+
+        // 画像を描画
+        ctx.drawImage(img,
+          (bgW - framedW) / 2 + whiteFrame,
+          (bgH - framedH) / 2 + whiteFrame,
+          imgW, imgH);
       };
-      reader.readAsDataURL(file);
+
+      img.src = URL.createObjectURL(file);
     });
   </script>
 </body>
