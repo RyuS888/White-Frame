@@ -1,62 +1,64 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>White Frame テスト</title>
   <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      text-align: center;
+      background: #fff;
+    }
+
+    h1 {
+      font-size: 1.2em;
+      margin-top: 1em;
+    }
+
+    input[type="file"] {
+      margin: 1em;
+    }
+
     canvas {
-      border: 1px solid #ccc;
       display: block;
-      margin: 20px auto;
+      margin: 0 auto 2em;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <h2 style="text-align:center;">White Frame テスト</h2>
-  <div style="text-align:center;">
-    <input type="file" id="fileInput">
-  </div>
+  <h1>White Frame テスト</h1>
+  <input type="file" accept="image/*" id="fileInput" />
+
   <canvas id="canvas"></canvas>
 
   <script>
-    const fileInput = document.getElementById('fileInput');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const input = document.getElementById("fileInput");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
-    fileInput.addEventListener('change', (e) => {
+    input.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function (event) {
+      reader.onload = function(event) {
         const img = new Image();
-        img.onload = function () {
-          // 白枠サイズと背景比率（5:4）の設定
-          const whiteMargin = 100;
-          const imgW = img.width;
-          const imgH = img.height;
-          const framedW = imgW + whiteMargin * 2;
-          const framedH = imgH + whiteMargin * 2;
+        img.onload = function() {
+          // 最大辺3000pxに抑えてスケーリング（描画失敗防止）
+          const maxSide = 3000;
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const imgW = img.width * scale;
+          const imgH = img.height * scale;
 
-          // 最終背景サイズ：5:4比率を保つようにcanvasを調整
-          let bgW = framedW;
-          let bgH = framedW * 4 / 5;
-          if (bgH < framedH) {
-            bgH = framedH;
-            bgW = bgH * 5 / 4;
-          }
-
-          canvas.width = bgW;
-          canvas.height = bgH;
-
-          // 背景白
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, bgW, bgH);
-
-          // 画像＋白枠を描画
-          const offsetX = (bgW - framedW) / 2 + whiteMargin;
-          const offsetY = (bgH - framedH) / 2 + whiteMargin;
-          ctx.drawImage(img, offsetX, offsetY, imgW, imgH);
+          canvas.width = imgW;
+          canvas.height = imgH;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, imgW, imgH);
         };
         img.src = event.target.result;
       };
