@@ -1,90 +1,80 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>White Frame テスト（4000px制限）</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 10px;
-      font-family: sans-serif;
-      text-align: center;
-    }
-    input[type="file"] {
-      margin: 1em 0;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto 2em;
-      max-width: 100%;
-      height: auto;
-      border: 1px solid #ccc;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whiteframe Preview</title>
+<style>
+  body { margin: 0; font-family: sans-serif; text-align: center; }
+  input { margin: 20px 0; }
+  img { max-width: 100%; height: auto; }
+</style>
 </head>
 <body>
-  <h2>White Frame テスト（長辺 ≤4000px）</h2>
-  <input type="file" id="imageInput" accept="image/*" />
 
-  <canvas id="canvas"></canvas>
+<h2>Whiteframe 長押し保存テスト</h2>
+<input type="file" accept="image/*" id="imgInput"><br>
+<div id="preview"></div>
 
-  <script>
-    const input = document.getElementById("imageInput");
-    const canvas = document.getElementById("canvas");
+<script>
+document.getElementById("imgInput").addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.onload = function() {
+    const whiteMargin = 100;
+    const baseW = img.width + whiteMargin * 2;
+    const baseH = img.height + whiteMargin * 2;
+
+    // 背景紙サイズを5:4比率に（縦長）
+    let bgW = baseW;
+    let bgH = Math.round(bgW * 4 / 5);
+    if (bgH < baseH) {
+      bgH = baseH;
+      bgW = Math.round(bgH * 5 / 4);
+    }
+
+    // 長辺を4000pxに制限してスケール比率を決定
+    const scale = Math.min(4000 / Math.max(bgW, bgH), 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bgW * scale);
+    canvas.height = Math.round(bgH * scale);
     const ctx = canvas.getContext("2d");
 
-    const whiteFrame = 100;
-    const bgAspectW = 4;
-    const bgAspectH = 5;
-    const maxEdge = 4000;
+    // 全体を白で塗る（背景紙）
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    input.addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.onload = () => {
-        let imgW = img.width;
-        let imgH = img.height;
+    // 元画像の描画位置
+    const imgX = (canvas.width - img.width * scale) / 2;
+    const imgY = (canvas.height - img.height * scale) / 2;
 
-        // 白枠込みサイズ
-        let framedW = imgW + whiteFrame * 2;
-        let framedH = imgH + whiteFrame * 2;
+    // 四辺白枠（透明ではなく塗る）
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(imgX - whiteMargin * scale, imgY - whiteMargin * scale,
+                 img.width * scale + whiteMargin * 2 * scale,
+                 img.height * scale + whiteMargin * 2 * scale);
 
-        // 背景紙比率=>4:5 or 5:4 depending on orientation
-        let bgW = framedW, bgH = framedW * (bgAspectH / bgAspectW);
-        if (bgH < framedH) {
-          bgH = framedH;
-          bgW = framedH * (bgAspectW / bgAspectH);
-        }
+    // 元画像描画
+    ctx.drawImage(img, imgX, imgY, img.width * scale, img.height * scale);
 
-        // リサイズ縮小率
-        const scale = Math.min(1, maxEdge / Math.max(bgW, bgH));
-        bgW = Math.round(bgW * scale);
-        bgH = Math.round(bgH * scale);
-        imgW = Math.round(imgW * scale);
-        imgH = Math.round(imgH * scale);
-        framedW = imgW + whiteFrame * 2;
-        framedH = imgH + whiteFrame * 2;
+    // 表示用に画像へ変換（長押し保存できる）
+    const imageURL = canvas.toDataURL("image/jpeg");
+    const outputImage = new Image();
+    outputImage.src = imageURL;
+    outputImage.alt = "保存用画像";
+    document.getElementById("preview").innerHTML = "";
+    document.getElementById("preview").appendChild(outputImage);
+  };
 
-        canvas.width = bgW;
-        canvas.height = bgH;
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+</script>
 
-        const offsetX = (bgW - framedW) / 2;
-        const offsetY = (bgH - framedH) / 2;
-
-        // 背景紙（白）
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, bgW, bgH);
-
-        // 白枠（上下左右同スペース）
-        ctx.fillRect(offsetX, offsetY, framedW, framedH);
-
-        // 画像本体
-        ctx.drawImage(img, offsetX + whiteFrame, offsetY + whiteFrame, imgW, imgH);
-      };
-      img.src = URL.createObjectURL(file);
-    });
-  </script>
 </body>
 </html>
