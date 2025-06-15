@@ -2,77 +2,107 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Whiteframe スマホ版テスト</title>
+  <title>Whiteframe テスト</title>
   <style>
-    body { margin: 0; padding: 0.5em; font-family: sans-serif; text-align: center; }
-    input[type="file"] { font-size: 1rem; margin: 1em 0; }
-    img { max-width: 100%; height: auto; display: block; margin-bottom: 2em; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 1em;
+    }
+    input, select {
+      font-size: 1em;
+      margin: 0.5em;
+    }
+    canvas, img {
+      max-width: 100%;
+      margin-top: 1em;
+    }
   </style>
 </head>
 <body>
-  <h2>Whiteframe スマホ版テスト</h2>
-  <input type="file" accept="image/*" id="imgIn">
-
-  <div id="preview"></div>
+  <h2>Whiteframe（スマホ版テスト）</h2>
+  <input type="file" id="imageInput" accept="image/*"><br>
+  <label for="bgOrientation">背景紙:</label>
+  <select id="bgOrientation">
+    <option value="horizontal">横</option>
+    <option value="vertical">縦</option>
+  </select>
+  <label for="borderSize">白枠(px):</label>
+  <select id="borderSize">
+    <option value="50">50</option>
+    <option value="100" selected>100</option>
+    <option value="200">200</option>
+  </select>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <br>
+  <img id="outputImage" alt="画像出力（長押しで保存）" />
 
   <script>
-    const imgIn = document.getElementById("imgIn");
-    const preview = document.getElementById("preview");
-    const whiteMargin = 100;
-    const maxEdge = 4000;
+    const imageInput = document.getElementById("imageInput");
+    const bgOrientation = document.getElementById("bgOrientation");
+    const borderSize = document.getElementById("borderSize");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const outputImage = document.getElementById("outputImage");
 
-    imgIn.addEventListener("change", (e) => {
+    function getBgRatio(orientation) {
+      return orientation === "vertical" ? 4 / 5 : 5 / 4;
+    }
+
+    function downscaleImage(img, maxLen = 4000) {
+      const scale = Math.min(1, maxLen / Math.max(img.width, img.height));
+      const width = img.width * scale;
+      const height = img.height * scale;
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      tempCanvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const scaled = new Image();
+      scaled.src = tempCanvas.toDataURL("image/png");
+      return new Promise((resolve) => {
+        scaled.onload = () => resolve(scaled);
+      });
+    }
+
+    imageInput.addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const img = new Image();
+      img.src = URL.createObjectURL(file);
 
-      img.onload = () => {
-        const baseW = img.width + whiteMargin * 2;
-        const baseH = img.height + whiteMargin * 2;
+      img.onload = async () => {
+        const scaledImg = await downscaleImage(img, 4000);
+        const border = parseInt(borderSize.value);
+        const orientation = bgOrientation.value;
+        const ratio = getBgRatio(orientation);
 
-        const bgRatio = isPortrait(img) ? 5/4 : 5/4; // currently portrait/landscape both 5:4 demo
-        let bgW = baseW;
-        let bgH = bgW / bgRatio;
-        if (bgH < baseH) {
-          bgH = baseH;
-          bgW = bgH * bgRatio;
+        const imgW = scaledImg.width;
+        const imgH = scaledImg.height;
+        const paddedW = imgW + border * 2;
+        const paddedH = imgH + border * 2;
+
+        let bgW, bgH;
+        if (orientation === "vertical") {
+          bgH = Math.max(paddedH, paddedW / ratio);
+          bgW = bgH * ratio;
+        } else {
+          bgW = Math.max(paddedW, paddedH * ratio);
+          bgH = bgW / ratio;
         }
 
-        const scale = Math.min(1, maxEdge / Math.max(bgW, bgH));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(bgW * scale);
-        canvas.height = Math.round(bgH * scale);
-        const ctx = canvas.getContext("2d");
-
-        ctx.fillStyle = "#fff";
+        canvas.width = Math.round(bgW);
+        canvas.height = Math.round(bgH);
+        ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const imgX = (canvas.width - img.width * scale) / 2;
-        const imgY = (canvas.height - img.height * scale) / 2;
+        const offsetX = (canvas.width - paddedW) / 2 + border;
+        const offsetY = (canvas.height - paddedH) / 2 + border;
+        ctx.drawImage(scaledImg, offsetX, offsetY, imgW, imgH);
 
-        ctx.fillRect(
-          imgX - whiteMargin * scale,
-          imgY - whiteMargin * scale,
-          img.width * scale + whiteMargin * 2 * scale,
-          img.height * scale + whiteMargin * 2 * scale
-        );
-
-        ctx.drawImage(img, imgX, imgY, img.width * scale, img.height * scale);
-
-        const url = canvas.toDataURL("image/jpeg");
-        const outImg = new Image();
-        outImg.src = url;
-        preview.innerHTML = "";
-        preview.appendChild(outImg);
+        outputImage.src = canvas.toDataURL("image/jpeg");
+        outputImage.style.display = "block";
       };
-
-      img.src = URL.createObjectURL(file);
     });
-
-    function isPortrait(img) {
-      return img.height >= img.width;
-    }
   </script>
 </body>
 </html>
