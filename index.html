@@ -1,80 +1,78 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Whiteframe Preview</title>
-<style>
-  body { margin: 0; font-family: sans-serif; text-align: center; }
-  input { margin: 20px 0; }
-  img { max-width: 100%; height: auto; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Whiteframe スマホ版テスト</title>
+  <style>
+    body { margin: 0; padding: 0.5em; font-family: sans-serif; text-align: center; }
+    input[type="file"] { font-size: 1rem; margin: 1em 0; }
+    img { max-width: 100%; height: auto; display: block; margin-bottom: 2em; }
+  </style>
 </head>
 <body>
+  <h2>Whiteframe スマホ版テスト</h2>
+  <input type="file" accept="image/*" id="imgIn">
 
-<h2>Whiteframe 長押し保存テスト</h2>
-<input type="file" accept="image/*" id="imgInput"><br>
-<div id="preview"></div>
+  <div id="preview"></div>
 
-<script>
-document.getElementById("imgInput").addEventListener("change", function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const img = new Image();
-  img.onload = function() {
+  <script>
+    const imgIn = document.getElementById("imgIn");
+    const preview = document.getElementById("preview");
     const whiteMargin = 100;
-    const baseW = img.width + whiteMargin * 2;
-    const baseH = img.height + whiteMargin * 2;
+    const maxEdge = 4000;
 
-    // 背景紙サイズを5:4比率に（縦長）
-    let bgW = baseW;
-    let bgH = Math.round(bgW * 4 / 5);
-    if (bgH < baseH) {
-      bgH = baseH;
-      bgW = Math.round(bgH * 5 / 4);
+    imgIn.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+
+      img.onload = () => {
+        const baseW = img.width + whiteMargin * 2;
+        const baseH = img.height + whiteMargin * 2;
+
+        const bgRatio = isPortrait(img) ? 5/4 : 5/4; // currently portrait/landscape both 5:4 demo
+        let bgW = baseW;
+        let bgH = bgW / bgRatio;
+        if (bgH < baseH) {
+          bgH = baseH;
+          bgW = bgH * bgRatio;
+        }
+
+        const scale = Math.min(1, maxEdge / Math.max(bgW, bgH));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(bgW * scale);
+        canvas.height = Math.round(bgH * scale);
+        const ctx = canvas.getContext("2d");
+
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const imgX = (canvas.width - img.width * scale) / 2;
+        const imgY = (canvas.height - img.height * scale) / 2;
+
+        ctx.fillRect(
+          imgX - whiteMargin * scale,
+          imgY - whiteMargin * scale,
+          img.width * scale + whiteMargin * 2 * scale,
+          img.height * scale + whiteMargin * 2 * scale
+        );
+
+        ctx.drawImage(img, imgX, imgY, img.width * scale, img.height * scale);
+
+        const url = canvas.toDataURL("image/jpeg");
+        const outImg = new Image();
+        outImg.src = url;
+        preview.innerHTML = "";
+        preview.appendChild(outImg);
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+
+    function isPortrait(img) {
+      return img.height >= img.width;
     }
-
-    // 長辺を4000pxに制限してスケール比率を決定
-    const scale = Math.min(4000 / Math.max(bgW, bgH), 1);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bgW * scale);
-    canvas.height = Math.round(bgH * scale);
-    const ctx = canvas.getContext("2d");
-
-    // 全体を白で塗る（背景紙）
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 元画像の描画位置
-    const imgX = (canvas.width - img.width * scale) / 2;
-    const imgY = (canvas.height - img.height * scale) / 2;
-
-    // 四辺白枠（透明ではなく塗る）
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(imgX - whiteMargin * scale, imgY - whiteMargin * scale,
-                 img.width * scale + whiteMargin * 2 * scale,
-                 img.height * scale + whiteMargin * 2 * scale);
-
-    // 元画像描画
-    ctx.drawImage(img, imgX, imgY, img.width * scale, img.height * scale);
-
-    // 表示用に画像へ変換（長押し保存できる）
-    const imageURL = canvas.toDataURL("image/jpeg");
-    const outputImage = new Image();
-    outputImage.src = imageURL;
-    outputImage.alt = "保存用画像";
-    document.getElementById("preview").innerHTML = "";
-    document.getElementById("preview").appendChild(outputImage);
-  };
-
-  const reader = new FileReader();
-  reader.onload = function(event) {
-    img.src = event.target.result;
-  };
-  reader.readAsDataURL(file);
-});
-</script>
-
+  </script>
 </body>
 </html>
