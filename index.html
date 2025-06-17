@@ -2,122 +2,124 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>WhiteFrame EXIFテスト版</title>
+  <title>Whiteframe 縦5:4テスト（EXIF保持＋長押し対応）</title>
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; }
-    canvas { max-width: 100%; margin-top: 20px; border: 1px solid #ccc; }
-    .controls { margin: 15px; }
-    input, select, button { margin: 5px; padding: 5px; }
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+    }
+    #preview {
+      margin-top: 20px;
+      max-width: 100%;
+    }
+    #preview img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
-  <h2>WhiteFrame - EXIF保持版</h2>
-  <div class="controls">
-    <input type="file" id="fileInput" accept="image/*" />
-    <select id="borderSize">
-      <option value="50">白枠 50px</option>
-      <option value="100" selected>白枠 100px</option>
-      <option value="200">白枠 200px</option>
-    </select>
-    <select id="bgRatio">
-      <option value="3:2">3:2</option>
-      <option value="4:3">4:3</option>
-      <option value="5:4" selected>5:4</option>
-      <option value="1:1">1:1</option>
-    </select>
-    <select id="orientation">
-      <option value="horizontal">背景：横</option>
-      <option value="vertical" selected>背景：縦</option>
-    </select>
-    <button onclick="processImage()">白背景つき画像を生成</button>
-    <button onclick="downloadImage()">保存（EXIF保持）</button>
-  </div>
-  <canvas id="canvas"></canvas>
-  <script src="https://unpkg.com/piexifjs"></script>
-  <script>
-    let originalImage = new Image();
-    let exifData = null;
+  <h2>画像選択</h2>
+  <input type="file" id="fileInput" accept="image/*" />
 
-    function processImage() {
-      const fileInput = document.getElementById('fileInput');
-      if (!fileInput.files.length) return alert("画像を選んでください");
+  <div id="preview">
+    <p>▼ スマホで長押し保存（EXIFなし）</p>
+    <img id="previewImage" />
+    <p>▼ EXIF保持画像の保存</p>
+    <button onclick="downloadImage()">EXIF付き保存</button>
+  </div>
+
+  <script>
+    let exifData = null;
+    let finalImageDataURL = null;
+
+    function resizeCanvasIfNeeded(canvas, maxSize) {
+      const { width, height } = canvas;
+      if (Math.max(width, height) <= maxSize) return canvas;
+
+      const scale = maxSize / Math.max(width, height);
+      const resized = document.createElement("canvas");
+      resized.width = Math.round(width * scale);
+      resized.height = Math.round(height * scale);
+      const ctx = resized.getContext("2d");
+      ctx.drawImage(canvas, 0, 0, resized.width, resized.height);
+      return resized;
+    }
+
+    document.getElementById("fileInput").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function (e) {
-        const binaryStr = e.target.result;
-        const exifObj = piexif.load(binaryStr);
-        exifData = piexif.dump(exifObj);
+      reader.onload = function (event) {
+        const originalDataURL = event.target.result;
+        try {
+          exifData = piexif.dump(piexif.load(originalDataURL));
+        } catch (e) {
+          exifData = null;
+        }
 
-        const base64 = 'data:image/jpeg;base64,' + btoa(binaryStr);
-        originalImage.onload = () => drawWithWhiteFrame(originalImage);
-        originalImage.src = base64;
+        const img = new Image();
+        img.onload = function () {
+          const whiteMargin = 100;
+
+          const baseW = img.width + whiteMargin * 2;
+          const baseH = img.height + whiteMargin * 2;
+
+          const targetRatio = 5 / 4; // 縦5:横4（つまり縦長）
+          let canvasW, canvasH;
+
+          if (baseH / baseW >= targetRatio) {
+            // 高さに合わせて背景紙を決定（幅が足りない）
+            canvasH = baseH;
+            canvasW = Math.round(canvasH / targetRatio);
+          } else {
+            // 幅に合わせて背景紙を決定（高さが足りない）
+            canvasW = baseW;
+            canvasH = Math.round(canvasW * targetRatio);
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = canvasW;
+          canvas.height = canvasH;
+
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, canvasW, canvasH);
+
+          const offsetX = Math.round((canvasW - baseW) / 2);
+          const offsetY = Math.round((canvasH - baseH) / 2);
+
+          ctx.fillStyle = "white";
+          ctx.fillRect(offsetX, offsetY, baseW, baseH);
+          ctx.drawImage(img, offsetX + whiteMargin, offsetY + whiteMargin);
+
+          // 縮小処理（スマホ用）
+          const maxLen = 4000;
+          const resizedCanvas = resizeCanvasIfNeeded(canvas, maxLen);
+
+          // 長押し保存用プレビュー
+          document.getElementById("previewImage").src = resizedCanvas.toDataURL("image/jpeg", 0.92);
+
+          // EXIF挿入用データURL
+          let jpegData = resizedCanvas.toDataURL("image/jpeg", 0.92);
+          if (exifData) {
+            finalImageDataURL = piexif.insert(exifData, jpegData);
+          } else {
+            finalImageDataURL = jpegData;
+          }
+        };
+        img.src = originalDataURL;
       };
-      reader.readAsBinaryString(fileInput.files[0]);
-    }
-
-    function drawWithWhiteFrame(img) {
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-
-      const border = parseInt(document.getElementById("borderSize").value);
-      const ratio = document.getElementById("bgRatio").value;
-      const orientation = document.getElementById("orientation").value;
-
-      // 画像サイズ取得＆長辺4000px制限
-      let [iw, ih] = [img.width, img.height];
-      const scale = Math.min(1, 4000 / Math.max(iw, ih));
-      iw = Math.round(iw * scale);
-      ih = Math.round(ih * scale);
-
-      // 白枠を追加（まずベース画像に白枠つける）
-      const withFrameW = iw + border * 2;
-      const withFrameH = ih + border * 2;
-
-      // 背景紙の比率取得（横長 or 縦長の調整）
-      let [rw, rh] = ratio.split(":").map(Number);
-      if (orientation === "vertical" && rw > rh) [rw, rh] = [rh, rw];
-      if (orientation === "horizontal" && rw < rh) [rw, rh] = [rh, rw];
-
-      // 最終サイズ（背景紙サイズ）は、白枠付き画像が収まる比率で計算
-      const frameRatio = withFrameW / withFrameH;
-      const targetRatio = rw / rh;
-      let finalW, finalH;
-
-      if (frameRatio > targetRatio) {
-        finalW = withFrameW;
-        finalH = Math.round(finalW / targetRatio);
-      } else {
-        finalH = withFrameH;
-        finalW = Math.round(finalH * targetRatio);
-      }
-
-      // キャンバス描画
-      canvas.width = finalW;
-      canvas.height = finalH;
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, finalW, finalH);
-
-      const offsetX = Math.round((finalW - withFrameW) / 2);
-      const offsetY = Math.round((finalH - withFrameH) / 2);
-
-      ctx.fillRect(offsetX, offsetY, withFrameW, withFrameH); // 白枠領域
-      ctx.drawImage(img, offsetX + border, offsetY + border, iw, ih); // 元画像
-
-      canvas.style.display = "block";
-    }
+      reader.readAsDataURL(file);
+    });
 
     function downloadImage() {
-      const canvas = document.getElementById("canvas");
-      if (!canvas.width || !canvas.height) return alert("画像を生成してください");
-
-      const jpegData = canvas.toDataURL("image/jpeg", 0.92);
-      const binary = atob(jpegData.split(',')[1]);
-      const array = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-
-      const inserted = piexif.insert(exifData, jpegData);
-      const a = document.createElement('a');
-      a.href = inserted;
+      if (!finalImageDataURL) return;
+      const a = document.createElement("a");
+      a.href = finalImageDataURL;
       a.download = "whiteframed.jpg";
       a.click();
     }
