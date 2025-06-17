@@ -1,108 +1,126 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Whiteframe テスト</title>
+  <meta charset="UTF-8" />
+  <title>WhiteFrame EXIFテスト版</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 1em;
-    }
-    input, select {
-      font-size: 1em;
-      margin: 0.5em;
-    }
-    canvas, img {
-      max-width: 100%;
-      margin-top: 1em;
-    }
+    body { font-family: sans-serif; text-align: center; }
+    canvas { max-width: 100%; margin-top: 20px; border: 1px solid #ccc; }
+    .controls { margin: 15px; }
+    input, select, button { margin: 5px; padding: 5px; }
   </style>
 </head>
 <body>
-  <h2>Whiteframe（スマホ版テスト）</h2>
-  <input type="file" id="imageInput" accept="image/*"><br>
-  <label for="bgOrientation">背景紙:</label>
-  <select id="bgOrientation">
-    <option value="horizontal">横</option>
-    <option value="vertical">縦</option>
-  </select>
-  <label for="borderSize">白枠(px):</label>
-  <select id="borderSize">
-    <option value="50">50</option>
-    <option value="100" selected>100</option>
-    <option value="200">200</option>
-  </select>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <br>
-  <img id="outputImage" alt="画像出力（長押しで保存）" />
-
+  <h2>WhiteFrame - EXIF保持版</h2>
+  <div class="controls">
+    <input type="file" id="fileInput" accept="image/*" />
+    <select id="borderSize">
+      <option value="50">白枠 50px</option>
+      <option value="100" selected>白枠 100px</option>
+      <option value="200">白枠 200px</option>
+    </select>
+    <select id="bgRatio">
+      <option value="3:2">3:2</option>
+      <option value="4:3">4:3</option>
+      <option value="5:4" selected>5:4</option>
+      <option value="1:1">1:1</option>
+    </select>
+    <select id="orientation">
+      <option value="horizontal">背景：横</option>
+      <option value="vertical" selected>背景：縦</option>
+    </select>
+    <button onclick="processImage()">白背景つき画像を生成</button>
+    <button onclick="downloadImage()">保存（EXIF保持）</button>
+  </div>
+  <canvas id="canvas"></canvas>
+  <script src="https://unpkg.com/piexifjs"></script>
   <script>
-    const imageInput = document.getElementById("imageInput");
-    const bgOrientation = document.getElementById("bgOrientation");
-    const borderSize = document.getElementById("borderSize");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const outputImage = document.getElementById("outputImage");
+    let originalImage = new Image();
+    let exifData = null;
 
-    function getBgRatio(orientation) {
-      return orientation === "vertical" ? 4 / 5 : 5 / 4;
-    }
+    function processImage() {
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files.length) return alert("画像を選んでください");
 
-    function downscaleImage(img, maxLen = 4000) {
-      const scale = Math.min(1, maxLen / Math.max(img.width, img.height));
-      const width = img.width * scale;
-      const height = img.height * scale;
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = width;
-      tempCanvas.height = height;
-      tempCanvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      const scaled = new Image();
-      scaled.src = tempCanvas.toDataURL("image/png");
-      return new Promise((resolve) => {
-        scaled.onload = () => resolve(scaled);
-      });
-    }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const binaryStr = e.target.result;
+        const exifObj = piexif.load(binaryStr);
+        exifData = piexif.dump(exifObj);
 
-    imageInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-
-      img.onload = async () => {
-        const scaledImg = await downscaleImage(img, 4000);
-        const border = parseInt(borderSize.value);
-        const orientation = bgOrientation.value;
-        const ratio = getBgRatio(orientation);
-
-        const imgW = scaledImg.width;
-        const imgH = scaledImg.height;
-        const paddedW = imgW + border * 2;
-        const paddedH = imgH + border * 2;
-
-        let bgW, bgH;
-        if (orientation === "vertical") {
-          bgH = Math.max(paddedH, paddedW / ratio);
-          bgW = bgH * ratio;
-        } else {
-          bgW = Math.max(paddedW, paddedH * ratio);
-          bgH = bgW / ratio;
-        }
-
-        canvas.width = Math.round(bgW);
-        canvas.height = Math.round(bgH);
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const offsetX = (canvas.width - paddedW) / 2 + border;
-        const offsetY = (canvas.height - paddedH) / 2 + border;
-        ctx.drawImage(scaledImg, offsetX, offsetY, imgW, imgH);
-
-        outputImage.src = canvas.toDataURL("image/jpeg");
-        outputImage.style.display = "block";
+        const base64 = 'data:image/jpeg;base64,' + btoa(binaryStr);
+        originalImage.onload = () => drawWithWhiteFrame(originalImage);
+        originalImage.src = base64;
       };
-    });
+      reader.readAsBinaryString(fileInput.files[0]);
+    }
+
+    function drawWithWhiteFrame(img) {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const border = parseInt(document.getElementById("borderSize").value);
+      const ratio = document.getElementById("bgRatio").value;
+      const orientation = document.getElementById("orientation").value;
+
+      // 画像サイズ取得＆長辺4000px制限
+      let [iw, ih] = [img.width, img.height];
+      const scale = Math.min(1, 4000 / Math.max(iw, ih));
+      iw = Math.round(iw * scale);
+      ih = Math.round(ih * scale);
+
+      // 白枠を追加（まずベース画像に白枠つける）
+      const withFrameW = iw + border * 2;
+      const withFrameH = ih + border * 2;
+
+      // 背景紙の比率取得（横長 or 縦長の調整）
+      let [rw, rh] = ratio.split(":").map(Number);
+      if (orientation === "vertical" && rw > rh) [rw, rh] = [rh, rw];
+      if (orientation === "horizontal" && rw < rh) [rw, rh] = [rh, rw];
+
+      // 最終サイズ（背景紙サイズ）は、白枠付き画像が収まる比率で計算
+      const frameRatio = withFrameW / withFrameH;
+      const targetRatio = rw / rh;
+      let finalW, finalH;
+
+      if (frameRatio > targetRatio) {
+        finalW = withFrameW;
+        finalH = Math.round(finalW / targetRatio);
+      } else {
+        finalH = withFrameH;
+        finalW = Math.round(finalH * targetRatio);
+      }
+
+      // キャンバス描画
+      canvas.width = finalW;
+      canvas.height = finalH;
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, finalW, finalH);
+
+      const offsetX = Math.round((finalW - withFrameW) / 2);
+      const offsetY = Math.round((finalH - withFrameH) / 2);
+
+      ctx.fillRect(offsetX, offsetY, withFrameW, withFrameH); // 白枠領域
+      ctx.drawImage(img, offsetX + border, offsetY + border, iw, ih); // 元画像
+
+      canvas.style.display = "block";
+    }
+
+    function downloadImage() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas.width || !canvas.height) return alert("画像を生成してください");
+
+      const jpegData = canvas.toDataURL("image/jpeg", 0.92);
+      const binary = atob(jpegData.split(',')[1]);
+      const array = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+
+      const inserted = piexif.insert(exifData, jpegData);
+      const a = document.createElement('a');
+      a.href = inserted;
+      a.download = "whiteframed.jpg";
+      a.click();
+    }
   </script>
 </body>
 </html>
