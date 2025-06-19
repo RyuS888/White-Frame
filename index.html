@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>WhiteFrame（更新版）</title>
+  <title>WhiteFrame（枠を追加ボタンあり）</title>
   <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
@@ -37,6 +37,7 @@
     <option value="horizontal">背景：横</option>
   </select>
   <br>
+  <button id="addFrameBtn">枠を追加</button>
   <div id="preview">
     <p>長押し保存用（EXIFなし）:</p>
     <img id="previewImage" />
@@ -45,7 +46,7 @@
   </div>
 
   <script>
-    let exifStr = null, finalDataURL = null;
+    let exifStr = null, originalImage = null, finalDataURL = null;
 
     document.getElementById('fileInput').addEventListener('change', e => {
       const file = e.target.files[0];
@@ -54,13 +55,15 @@
       reader.onload = ev => {
         try { exifStr = piexif.dump(piexif.load(ev.target.result)); } catch { exifStr = null; }
         const img = new Image();
-        img.onload = () => process(img);
+        img.onload = () => { originalImage = img; };
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     });
 
-    function process(img) {
+    document.getElementById('addFrameBtn').addEventListener('click', () => {
+      if (!originalImage) return;
+      const img = originalImage;
       const border = +document.getElementById('borderSize').value;
       const ratioSel = document.getElementById('bgRatio').value;
       let rw, rh;
@@ -73,7 +76,7 @@
       if (ratioSel && ori==='vertical' && rw>rh) [rw, rh] = [rh, rw];
       if (ratioSel && ori==='horizontal' && rw<rh) [rw, rh] = [rh, rw];
 
-      const scale = Math.min(1, 4000/Math.max(img.width, img.height));
+      const scale = Math.min(1, 4000 / Math.max(img.width, img.height));
       const iw = img.width * scale, ih = img.height * scale;
       const wW = iw + border * 2, wH = ih + border * 2;
       let cW = wW, cH = wH;
@@ -94,7 +97,7 @@
       const jpeg = canvas.toDataURL('image/jpeg', 0.92);
       finalDataURL = exifStr ? piexif.insert(exifStr, jpeg) : jpeg;
       document.getElementById('previewImage').src = jpeg;
-    }
+    });
 
     document.getElementById('downloadBtn').addEventListener('click', () => {
       if (!finalDataURL) return;
