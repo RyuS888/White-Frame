@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>WhiteFrame</title>
+  <title>WhiteFrame（更新版）</title>
   <script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: sans-serif; padding:0.5em; text-align:center; }
-    input, select, button { margin:6px; padding:6px; font-size:1rem; }
-    #previewImage { max-width:100%; height:auto; margin-top:12px; border:1px solid #ccc; }
+    body { background-color: black; color: white; font-family: sans-serif; padding: 0.5em; text-align: center; }
+    input, select, button { font-size: 1rem; margin: 6px; padding: 6px; }
+    #previewImage { max-width: 100%; height: auto; margin-top: 12px; border: 1px solid #888; }
+    button { color: black; }
   </style>
 </head>
 <body>
@@ -20,34 +21,38 @@
     <option value="200">白枠 200px</option>
   </select>
   <select id="bgRatio">
+    <option>変更なし</option>
     <option value="3:2">3:2</option>
     <option value="4:3">4:3</option>
-    <option value="5:4" selected>5:4</option>
-    <option value="1:1">1:1</option>
+    <option value="5:4">5:4</option>
+    <option value="16:9">16:9</option>
+    <option value="16:10">16:10</option>
+    <option value="2:1">2:1</option>
+    <option value="2.35:1">2.35:1</option>
+    <option value="3:1">3:1</option>
+    <option value="7:6">7:6</option>
   </select>
   <select id="orientation">
-    <option value="vertical" selected>背景：縦</option>
+    <option value="vertical">背景：縦</option>
     <option value="horizontal">背景：横</option>
   </select>
   <br>
   <div id="preview">
-    <p>長押し保存（Exifなし）:</p>
+    <p>長押し保存用（EXIFなし）:</p>
     <img id="previewImage" />
     <p>Exif付き保存:</p>
     <button id="downloadBtn">保存</button>
   </div>
 
   <script>
-    let exifStr = null;
-    let finalDataURL = null;
+    let exifStr = null, finalDataURL = null;
 
     document.getElementById('fileInput').addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
-        try { exifStr = piexif.dump(piexif.load(ev.target.result)); }
-        catch { exifStr = null; }
+        try { exifStr = piexif.dump(piexif.load(ev.target.result)); } catch { exifStr = null; }
         const img = new Image();
         img.onload = () => process(img);
         img.src = ev.target.result;
@@ -57,30 +62,38 @@
 
     function process(img) {
       const border = +document.getElementById('borderSize').value;
-      let [rw, rh] = document.getElementById('bgRatio').value.split(':').map(Number);
+      const ratioSel = document.getElementById('bgRatio').value;
+      let rw, rh;
+      if (!ratioSel || ratioSel === '変更なし') {
+        rw = img.width; rh = img.height;
+      } else {
+        [rw, rh] = ratioSel.split(':').map(Number);
+      }
       const ori = document.getElementById('orientation').value;
-      if (ori==='vertical' && rw>rh) [rw, rh] = [rh, rw];
-      if (ori==='horizontal' && rw<rh) [rw, rh] = [rh, rw];
+      if (ratioSel && ori==='vertical' && rw>rh) [rw, rh] = [rh, rw];
+      if (ratioSel && ori==='horizontal' && rw<rh) [rw, rh] = [rh, rw];
 
       const scale = Math.min(1, 4000/Math.max(img.width, img.height));
-      const iw = img.width*scale, ih = img.height*scale;
-      const wW = iw + border*2, wH = ih + border*2;
-      const ratio = rw / rh;
-      let cW, cH;
-      if (wW / wH > ratio) { cW=wW; cH=wW/ratio; }
-      else { cH=wH; cW=wH*ratio; }
+      const iw = img.width * scale, ih = img.height * scale;
+      const wW = iw + border * 2, wH = ih + border * 2;
+      let cW = wW, cH = wH;
+      if (ratioSel && ratioSel!=='変更なし') {
+        const r = rw / rh;
+        if (wW / wH > r) { cW = wW; cH = wW / r; }
+        else { cH = wH; cW = wH * r; }
+      }
+
       const canvas = document.createElement('canvas');
       canvas.width = cW; canvas.height = cH;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0,0,cW,cH);
-      const x = (cW - wW)/2, y=(cH - wH)/2;
-      ctx.fillRect(x,y,wW,wH);
-      ctx.drawImage(img, x+border, y+border, iw, ih);
+      ctx.fillStyle = 'white'; ctx.fillRect(0,0,cW,cH);
+      const x = (cW - wW)/2, y = (cH - wH)/2;
+      ctx.fillRect(x, y, wW, wH);
+      ctx.drawImage(img, x + border, y + border, iw, ih);
 
-      const data = canvas.toDataURL('image/jpeg',0.92);
-      finalDataURL = exifStr ? piexif.insert(exifStr, data) : data;
-      document.getElementById('previewImage').src = data;
+      const jpeg = canvas.toDataURL('image/jpeg', 0.92);
+      finalDataURL = exifStr ? piexif.insert(exifStr, jpeg) : jpeg;
+      document.getElementById('previewImage').src = jpeg;
     }
 
     document.getElementById('downloadBtn').addEventListener('click', () => {
